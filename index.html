@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Comparação Eólica NE - Restrição vs Previsão</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #2196F3 0%, #4CAF50 100%);
+            min-height: 100vh;
+        }
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+        .stats {
+            color: #666;
+            font-size: 1.1em;
+            margin-top: 15px;
+            line-height: 1.8;
+        }
+        .alert {
+            background: #E3F2FD;
+            border: 2px solid #2196F3;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 1200px;
+            color: #0D47A1;
+            font-weight: bold;
+        }
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 30px auto;
+            max-width: 1800px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        .section h2 {
+            text-align: center;
+            color: #2196F3;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        .section h3 {
+            color: #4CAF50;
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .section img {
+            width: 100%;
+            cursor: pointer;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .nav {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .nav a {
+            display: inline-block;
+            margin: 0 10px;
+            padding: 12px 30px;
+            background: white;
+            color: #2196F3;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            transition: all 0.3s;
+        }
+        .nav a:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.25);
+            background: #2196F3;
+            color: white;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            max-width: 1900px;
+            margin: 0 auto;
+        }
+        .mes-container {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .mes-titulo {
+            margin: 0 0 20px 0;
+            color: #2196F3;
+            font-size: 1.8em;
+            border-bottom: 3px solid #2196F3;
+            padding-bottom: 10px;
+            text-align: center;
+        }
+        .plots-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .plot-card {
+            display: flex;
+            flex-direction: column;
+        }
+        .plot-card h4 {
+            margin: 0 0 10px 0;
+            color: #666;
+            font-size: 1.1em;
+            text-align: center;
+        }
+        .plot-card img {
+            width: 100%;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .plot-card img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+        .lightbox {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            padding-top: 50px;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.95);
+        }
+        .lightbox-content {
+            margin: auto;
+            display: block;
+            width: 95%;
+            max-width: 1800px;
+        }
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .close:hover {
+            color: #ff6b6b;
+        }
+        .legend {
+            background: #FFF3CD;
+            border: 2px solid #FF9800;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 1200px;
+        }
+        .legend h4 {
+            color: #F57C00;
+            margin-top: 0;
+            font-size: 1.3em;
+        }
+        .legend ul {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        .legend li {
+            color: #856404;
+            margin: 8px 0;
+            font-size: 1.05em;
+        }
+        .legend strong {
+            color: #E65100;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Comparação Eólica Nordeste</h1>
+        <div class="stats">
+            🎯 <strong>OBJETIVO:</strong> Comparar dados de geração eólica do Nordeste entre duas fontes<br>
+            📦 <strong>Fonte 1:</strong> tbl_restricao_eolica (middle) - Dados de restrição agregados por semi-hora<br>
+            📊 <strong>Fonte 2:</strong> tbl_renovaveis (dessem) - Campo NE_UEE (previsão NE)<br>
+            🔍 <strong>Análise:</strong> Comparação com gráficos de barras mensais e série temporal
+        </div>
+    </div>
+
+    <div class="legend">
+        <h4>📖 Legenda das Séries</h4>
+        <ul>
+            <li><strong style="color: #2196F3;">Geração Real (barras azuis):</strong> Soma de val_geracao da tbl_restricao_eolica (subsistema NE)</li>
+            <li><strong style="color: #FF9800;">Geração Referência (barras laranjas):</strong> Soma de val_geracaoreferencia da tbl_restricao_eolica (subsistema NE)</li>
+            <li><strong style="color: #4CAF50;">Previsão NE_UEE (linha verde):</strong> Campo NE_UEE da tbl_renovaveis (previsão de eólica no Nordeste)</li>
+        </ul>
+    </div>
+
+    <!-- Plots Comparativos Gerais -->
+    <div class="section">
+        <h2>📈 Visualizações Gerais</h2>
+
+        <h3>Comparação Mensal - Barras com Linha de Previsão</h3>
+        <p style="text-align: center; color: #666; font-size: 1.05em; margin-bottom: 20px;">
+            Barras representam as médias mensais de Geração Real e Referência. A linha verde mostra a Previsão NE_UEE.
+        </p>
+        <img src="resultados/barras_mensal.png"
+             onclick="openLightbox('resultados/barras_mensal.png')"
+             alt="Comparação Mensal - Barras">
+    </div>
+
+    <!-- Navegação -->
+    <div class="nav">
+        <a href="#mensal">📊 Análise Mensal Detalhada</a>
+        <a href="tabelas_modulacao.html" target="_blank">📋 Tabelas de Modulação por Mês</a>
+        <a href="comparacao_anos.html" target="_blank">📅 Comparação entre Anos</a>
+    </div>
+
+    <!-- Plots Mensais -->
+    <div class="section" id="mensal">
+        <h2>📅 Análise Mensal Detalhada</h2>
+        <p style="text-align: center; color: #666; font-size: 1.1em; margin-bottom: 30px;">
+            <strong>Cada mês apresenta 4 análises:</strong><br>
+            📊 <strong>1. Semi-horário:</strong> Comparação temporal completa (resolução 30 min) |
+            📈 <strong>2. Diário:</strong> Médias diárias<br>
+            📉 <strong>3. Modulação Diária:</strong> Padrão intradiário médio (% da média diária) |
+            📋 <strong>4. Tabela:</strong> Valores de modulação por hora<br>
+            <em>Ordenado do mais recente para o mais antigo • Clique nas imagens para ampliar</em>
+        </p>
+        <div class="container" id="container-mensal">
+            <!-- Será preenchido dinamicamente -->
+        </div>
+    </div>
+
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="close">&times;</span>
+        <img class="lightbox-content" id="lightbox-img">
+    </div>
+
+    <script>
+        function openLightbox(imgSrc) {
+            document.getElementById('lightbox').style.display = 'block';
+            document.getElementById('lightbox-img').src = imgSrc;
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeLightbox();
+            }
+        });
+
+        // Função para listar os arquivos de imagem
+        async function carregarImagens() {
+            // Meses disponíveis (gerados pelo script) - DO MAIS NOVO PARA O MAIS ANTIGO
+            const meses = [
+                '2025-10', '2025-09', '2025-08', '2025-07', '2025-06', '2025-05',
+                '2025-04', '2025-03', '2025-02', '2025-01',
+                '2024-12', '2024-11', '2024-10', '2024-09', '2024-08', '2024-07',
+                '2024-06', '2024-05', '2024-04', '2024-03', '2024-02', '2024-01',
+                '2023-12', '2023-11', '2023-10', '2023-09', '2023-08', '2023-07',
+                '2023-06', '2023-05', '2023-04', '2023-03', '2023-02', '2023-01',
+                '2022-12', '2022-11', '2022-10', '2022-09',
+                '2022-08', '2022-07', '2022-06', '2022-05', '2022-02', '2022-01',
+                '2021-12', '2021-10'
+            ];
+
+            const containerMensal = document.getElementById('container-mensal');
+
+            meses.forEach(mes => {
+                // Caminhos das imagens
+                const imgSemihorario = `resultados/mensal/${mes}_semihorario.png`;
+                const imgDiario = `resultados/mensal/${mes}_diario.png`;
+                const imgModulacao = `resultados/mensal/${mes}_modulacao.png`;
+                const imgTabela = `resultados/mensal/${mes}_tabela.png`;
+
+                // Container do mês
+                const mesContainer = document.createElement('div');
+                mesContainer.className = 'mes-container';
+                mesContainer.innerHTML = `
+                    <h3 class="mes-titulo">📅 ${mes}</h3>
+
+                    <!-- Linha 1: Semi-horário + Diário -->
+                    <div class="plots-row">
+                        <div class="plot-card">
+                            <h4>📊 Semi-horário</h4>
+                            <img src="${imgSemihorario}"
+                                 onclick="openLightbox('${imgSemihorario}')"
+                                 alt="${mes} Semi-horário"
+                                 onerror="this.parentElement.parentElement.parentElement.style.display='none'">
+                        </div>
+                        <div class="plot-card">
+                            <h4>📈 Diário</h4>
+                            <img src="${imgDiario}"
+                                 onclick="openLightbox('${imgDiario}')"
+                                 alt="${mes} Diário"
+                                 onerror="this.parentElement.parentElement.parentElement.style.display='none'">
+                        </div>
+                    </div>
+
+                    <!-- Linha 2: Modulação + Tabela -->
+                    <div class="plots-row">
+                        <div class="plot-card">
+                            <h4>📉 Modulação Diária</h4>
+                            <img src="${imgModulacao}"
+                                 onclick="openLightbox('${imgModulacao}')"
+                                 alt="${mes} Modulação"
+                                 onerror="this.parentElement.parentElement.parentElement.style.display='none'">
+                        </div>
+                        <div class="plot-card">
+                            <h4>📋 Tabela por Hora</h4>
+                            <img src="${imgTabela}"
+                                 onclick="openLightbox('${imgTabela}')"
+                                 alt="${mes} Tabela"
+                                 onerror="this.parentElement.parentElement.parentElement.style.display='none'">
+                        </div>
+                    </div>
+                `;
+                containerMensal.appendChild(mesContainer);
+            });
+        }
+
+        // Carregar imagens quando a página carregar
+        window.addEventListener('load', carregarImagens);
+    </script>
+</body>
+</html>
