@@ -342,16 +342,16 @@
                     htmlAnos += '</div>';
 
                     // Modulação
-                    htmlAnos += '<div class="separador">📉 Modulação Diária por Ano</div>';
+                    htmlAnos += '<div class="separador">📉 Modulação Diária por Ano (Escala Uniforme)</div>';
                     htmlAnos += '<div class="plots-row-anos" style="display: grid; grid-template-columns: repeat(' + anos.length + ', 1fr); gap: 15px; margin-bottom: 30px;">';
                     anos.forEach(ano => {
                         const corAno = coresAnos[ano] || '#333';
                         htmlAnos += `
                             <div class="plot-card">
-                                <h4 style="color: ${corAno};">📉 ${ano} - Modulação</h4>
-                                <img src="resultados/mensal/${ano}-${mesStr}_modulacao.png"
-                                     onclick="openLightbox('resultados/mensal/${ano}-${mesStr}_modulacao.png')"
-                                     alt="${ano}-${mesStr} Modulação"
+                                <h4 style="color: ${corAno};">📉 ${ano} - Modulação (escala uniforme)</h4>
+                                <img src="resultados/comparacao_anos/modulacao_uniforme/${ano}-${mesStr}_modulacao_uniforme.png"
+                                     onclick="openLightbox('resultados/comparacao_anos/modulacao_uniforme/${ano}-${mesStr}_modulacao_uniforme.png')"
+                                     alt="${ano}-${mesStr} Modulação (escala uniforme)"
                                      onerror="this.parentElement.style.display='none'">
                             </div>
                         `;

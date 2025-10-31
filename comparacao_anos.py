@@ -16,6 +16,12 @@ print("\nCarregando dados...")
 df_ne = pd.read_csv('resultados/dados_completos.csv')
 df_ne['timestamp'] = pd.to_datetime(df_ne['timestamp'])
 
+MESES_NOMES = {
+    1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
+    5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+    9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+}
+
 def calcular_modulacao(df, tem_previsao=True):
     """Calcula modulação para cada ano-mês"""
     df['ano'] = df['timestamp'].dt.year
@@ -72,18 +78,142 @@ def calcular_modulacao(df, tem_previsao=True):
 
     return resultado
 
+
+def calcular_modulacao_diaria_mes(df_mes):
+    """Calcula modulação diária para preservar série temporal do mês."""
+    df_mes = df_mes.copy().sort_values('timestamp')
+
+    df_mes['hora'] = df_mes['timestamp'].dt.hour
+    df_mes['minuto'] = df_mes['timestamp'].dt.minute
+    df_mes['hora_decimal'] = df_mes['hora'] + df_mes['minuto'] / 60.0
+    df_mes['data'] = df_mes['timestamp'].dt.date
+
+    agregacoes = {
+        'geracao_total': 'mean',
+        'geracao_referencia_total': 'mean'
+    }
+    tem_previsao = 'NE_UEE' in df_mes.columns and df_mes['NE_UEE'].notna().any()
+    if tem_previsao:
+        agregacoes['NE_UEE'] = 'mean'
+
+    medias_diarias = df_mes.groupby('data').agg(agregacoes).reset_index()
+    renomear = {
+        'geracao_total': 'media_dia_real',
+        'geracao_referencia_total': 'media_dia_ref'
+    }
+    if tem_previsao:
+        renomear['NE_UEE'] = 'media_dia_prev'
+    medias_diarias = medias_diarias.rename(columns=renomear)
+
+    df_mes = df_mes.merge(medias_diarias, on='data', how='left')
+
+    df_mes['pct_real'] = np.where(
+        df_mes['media_dia_real'] != 0,
+        (df_mes['geracao_total'] / df_mes['media_dia_real']) * 100,
+        np.nan
+    )
+    df_mes['pct_ref'] = np.where(
+        df_mes['media_dia_ref'] != 0,
+        (df_mes['geracao_referencia_total'] / df_mes['media_dia_ref']) * 100,
+        np.nan
+    )
+
+    if tem_previsao:
+        df_mes['pct_prev'] = np.where(
+            df_mes['media_dia_prev'] != 0,
+            (df_mes['NE_UEE'] / df_mes['media_dia_prev']) * 100,
+            np.nan
+        )
+
+    return df_mes
+
+
+def criar_modulacao_por_ano_uniforme(df, output_dir):
+    """Gera gráficos de modulação por ano com escala uniforme por mês."""
+    print("\nGerando modulação por ano com escala uniforme...")
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    df = df.copy()
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df['ano'] = df['timestamp'].dt.year
+    df['mes'] = df['timestamp'].dt.month
+
+    modulacoes_por_periodo = {}
+    limites_por_mes = {}
+
+    for (ano, mes), df_periodo in df.groupby(['ano', 'mes']):
+        if df_periodo.empty:
+            continue
+
+        df_modulacao = calcular_modulacao_diaria_mes(df_periodo)
+        modulacoes_por_periodo[(ano, mes)] = df_modulacao
+
+        colunas_pct = ['pct_real', 'pct_ref']
+        if 'pct_prev' in df_modulacao.columns:
+            colunas_pct.append('pct_prev')
+
+        valores_pct = df_modulacao[colunas_pct].to_numpy().flatten()
+        valores_pct = valores_pct[np.isfinite(valores_pct)]
+        max_pct = valores_pct.max() if valores_pct.size else 0
+
+        limites_por_mes[mes] = max(limites_por_mes.get(mes, 0), max_pct)
+
+    limites_por_mes = {
+        mes: max(10 * np.ceil(limite / 10.0), 120) if limite > 0 else 120
+        for mes, limite in limites_por_mes.items()
+    }
+
+    arquivos_gerados = 0
+    meses_com_registro = set()
+
+    for (ano, mes), df_modulacao in modulacoes_por_periodo.items():
+        meses_com_registro.add(mes)
+        y_max = limites_por_mes.get(mes, 120)
+
+        fig, ax = plt.subplots(figsize=(14, 8))
+
+        ax.plot(df_modulacao['timestamp'], df_modulacao['pct_real'],
+                label='Geração Real', color='#2196F3', linewidth=1.5, alpha=0.8)
+        ax.plot(df_modulacao['timestamp'], df_modulacao['pct_ref'],
+                label='Geração Referência', color='#FF9800', linewidth=1.5, alpha=0.8)
+
+        if 'pct_prev' in df_modulacao.columns:
+            ax.plot(df_modulacao['timestamp'], df_modulacao['pct_prev'],
+                    label='Previsão NE_UEE', color='#4CAF50', linewidth=2, alpha=0.9)
+
+        ax.axhline(y=100, color='gray', linestyle='--', linewidth=1.5, alpha=0.7,
+                   label='Média Diária (100%)')
+
+        ax.set_xlabel('Data', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Geração (% da Média Diária)', fontsize=12, fontweight='bold')
+        ax.set_title(
+            f"Modulação Diária - {ano}-{mes:02d} ({MESES_NOMES.get(mes, mes)})",
+            fontsize=16, fontweight='bold', pad=20
+        )
+        ax.legend(fontsize=11, loc='upper left')
+        ax.grid(True, alpha=0.3)
+        ax.set_ylim(0, y_max)
+        ax.set_xlim(df_modulacao['timestamp'].min(), df_modulacao['timestamp'].max())
+        plt.xticks(rotation=45)
+
+        plt.tight_layout()
+
+        filename = f"{output_dir}/{ano}-{mes:02d}_modulacao_uniforme.png"
+        plt.savefig(filename, dpi=150, bbox_inches='tight')
+        plt.close()
+
+        arquivos_gerados += 1
+        print(f"  Salvo: {filename}")
+
+    return arquivos_gerados, meses_com_registro
+
 def criar_graficos_comparacao(modulacao, output_dir, nome_arquivo, titulo_base=""):
     """Cria gráficos comparando anos para cada mês - apenas NE"""
 
     os.makedirs(output_dir, exist_ok=True)
 
     # Para cada mês (1 a 12)
-    meses_nomes = {
-        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril',
-        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
-        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
-    }
-
     cores_anos = {
         2021: '#FF6B6B',
         2022: '#4ECDC4',
@@ -116,7 +246,7 @@ def criar_graficos_comparacao(modulacao, output_dir, nome_arquivo, titulo_base="
 
         ax.set_xlabel('Hora do Dia', fontsize=12, fontweight='bold')
         ax.set_ylabel('Geração Real (% da Média Diária)', fontsize=12, fontweight='bold')
-        ax.set_title(f'{titulo_base} - Modulação Geração Real - {meses_nomes[mes]} (Comparação entre Anos)',
+        ax.set_title(f'{titulo_base} - Modulação Geração Real - {MESES_NOMES[mes]} (Comparação entre Anos)',
                      fontsize=16, fontweight='bold', pad=20)
         ax.legend(fontsize=11, loc='best', ncol=2)
         ax.grid(True, alpha=0.3)
@@ -143,7 +273,7 @@ def criar_graficos_comparacao(modulacao, output_dir, nome_arquivo, titulo_base="
 
         ax.set_xlabel('Hora do Dia', fontsize=12, fontweight='bold')
         ax.set_ylabel('Geração Referência (% da Média Diária)', fontsize=12, fontweight='bold')
-        ax.set_title(f'{titulo_base} - Modulação Geração Referência - {meses_nomes[mes]} (Comparação entre Anos)',
+        ax.set_title(f'{titulo_base} - Modulação Geração Referência - {MESES_NOMES[mes]} (Comparação entre Anos)',
                      fontsize=16, fontweight='bold', pad=20)
         ax.legend(fontsize=11, loc='best', ncol=2)
         ax.grid(True, alpha=0.3)
@@ -171,7 +301,7 @@ def criar_graficos_comparacao(modulacao, output_dir, nome_arquivo, titulo_base="
 
         ax.set_xlabel('Hora do Dia', fontsize=12, fontweight='bold')
         ax.set_ylabel('Previsão NE_UEE (% da Média Diária)', fontsize=12, fontweight='bold')
-        ax.set_title(f'{titulo_base} - Modulação Previsão - {meses_nomes[mes]} (Comparação entre Anos)',
+        ax.set_title(f'{titulo_base} - Modulação Previsão - {MESES_NOMES[mes]} (Comparação entre Anos)',
                      fontsize=16, fontweight='bold', pad=20)
         ax.legend(fontsize=11, loc='best', ncol=2)
         ax.grid(True, alpha=0.3)
@@ -323,7 +453,7 @@ def criar_graficos_comparacao(modulacao, output_dir, nome_arquivo, titulo_base="
 
         ax.set_xlabel('Hora do Dia', fontsize=12, fontweight='bold')
         ax.set_ylabel('Geração (% da Média Diária)', fontsize=12, fontweight='bold')
-        ax.set_title(f'{titulo_base} - Dados Horários do Mês - {meses_nomes[mes]} (Comparação entre Anos)',
+        ax.set_title(f'{titulo_base} - Dados Horários do Mês - {MESES_NOMES[mes]} (Comparação entre Anos)',
                      fontsize=16, fontweight='bold', pad=20)
         ax.legend(fontsize=10, loc='best', ncol=2)
         ax.grid(True, alpha=0.3)
@@ -342,6 +472,11 @@ print("\n" + "="*80)
 print("PROCESSANDO: NE COMPLETO")
 print("="*80)
 modulacao_ne = calcular_modulacao(df_ne, tem_previsao=True)
+dir_modulacao_uniforme = 'resultados/comparacao_anos/modulacao_uniforme'
+total_mod_uniforme, meses_mod_uniforme = criar_modulacao_por_ano_uniforme(
+    df_ne,
+    dir_modulacao_uniforme
+)
 criar_graficos_comparacao(modulacao_ne, 'resultados/comparacao_anos', 'ne',
                           titulo_base='NE Completo')
 
@@ -353,3 +488,4 @@ print("  • 12 meses × 7 visualizações = 84 arquivos")
 print("  • 3 gráficos de modulação (Real, Ref, Prev)")
 print("  • 3 tabelas (Real, Ref, Prev)")
 print("  • 1 gráfico horário do mês inteiro")
+print(f"  • Modulação por ano (escala uniforme): {total_mod_uniforme} arquivos em {len(meses_mod_uniforme)} meses")

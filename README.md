@@ -1,5 +1,7 @@
 # Análise de Geração Eólica - Nordeste
 
+[🔗 Acesse a versão publicada](https://luizreal05.github.io/analise-eolica-ne/)
+
 Sistema de análise e visualização de dados de geração eólica no subsistema Nordeste, comparando dados reais, de referência e previsões.
 
 ## 📊 Características
